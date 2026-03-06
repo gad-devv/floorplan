@@ -1,0 +1,17 @@
+<svg width="589" height="299" viewBox="0 0 589 299" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="floor-01">
+<rect width="589" height="299" fill="white"/>
+<g id="shop-01">
+<path id="Rectangle 2" d="M189 137H289L209 197H109L189 137Z" fill="#D9D9D9"/>
+<path id="Rectangle 4" d="M289 137V146.5L209 206.5V197L289 137Z" fill="#C0C0C0"/>
+<path id="Rectangle 3" d="M109 197H209V206.5H109V197Z" fill="#D2D2D2"/>
+<text id="S01" fill="black" style="white-space: pre" xml:space="preserve" font-family="Inter" font-size="12" letter-spacing="0em"><tspan x="188" y="169.864">S01</tspan></text>
+</g>
+<g id="shop-02">
+<path id="Rectangle 2_2" d="M312 137H412L332 197H232L312 137Z" fill="#D9D9D9"/>
+<path id="Rectangle 4_2" d="M412 137V146.5L332 206.5V197L412 137Z" fill="#C0C0C0"/>
+<path id="Rectangle 3_2" d="M232 197H332V206.5H232V197Z" fill="#D2D2D2"/>
+<text id="S02" fill="black" style="white-space: pre" xml:space="preserve" font-family="Inter" font-size="12" letter-spacing="0em"><tspan x="310" y="169.864">S02</tspan></text>
+</g>
+</g>
+</svg>
