@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Interactive Floor Plan v1.02 - Full Width & Hue Highlight</title>
   
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
@@ -34,9 +34,7 @@
       height: 100%;
       display: block;
     }
-html, body, #container, #map-area, #map-svg, #floorplan {
-  touch-action: manipulation;
-}
+svg { touch-action: none; -webkit-user-drag: none; -webkit-user-select: none; user-select: none; }
     #shop-list-container {
       height:40vh; max-height:300px; overflow-y:auto; background:#fff; border-top:1px solid #e2e8f0;
       padding:16px; font-size:1rem; color:#2d3748;
@@ -311,24 +309,14 @@ fetch(svgUrl)
       });
 
     // ── Zoom behavior ────────────────────────────────────────────
-  /*  zoomBehavior = d3.zoom()
+   zoomBehavior = d3.zoom()
       .scaleExtent([0.3, 12])
       .translateExtent([[-3000, -3000], [5000, 5000]])
       .on("zoom", ({transform}) => {
         mapGroup.setAttribute("transform", transform);
-      });*/
+      });
 
-    zoomBehavior = d3.zoom()
-  .scaleExtent([0.3, 12])
-  .translateExtent([[-3000, -3000], [5000, 5000]])
-  .touchable(true)                     // ← explicit touch support
-  .filter(event => {
-    if (event.type.startsWith("touch")) return true;
-    return !event.button;
-  })
-  .on("zoom", ({transform}) => {
-    mapGroup.setAttribute("transform", transform);
-  });
+
 
     svg.call(zoomBehavior);
 
