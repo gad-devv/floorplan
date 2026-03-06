@@ -3,17 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Interactive Floor Plan v1.03 - Full Width & Hue Highlight</title>
-  
+  <title>Interactive Floor Plan v1.04 - Fixed Mobile Zoom</title>
+
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
-  
+
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: system-ui, -apple-system, sans-serif;
       background: #f8f9fa;
@@ -33,8 +28,12 @@
       width: 100%;
       height: 100%;
       display: block;
+      touch-action: none;                 /* important for pointer/touch gestures */
+      -webkit-user-drag: none;
+      -webkit-user-select: none;
+      user-select: none;
     }
-svg { touch-action: none; -webkit-user-drag: none; -webkit-user-select: none; user-select: none; }
+
     #shop-list-container {
       height:40vh; max-height:300px; overflow-y:auto; background:#fff; border-top:1px solid #e2e8f0;
       padding:16px; font-size:1rem; color:#2d3748;
@@ -49,22 +48,11 @@ svg { touch-action: none; -webkit-user-drag: none; -webkit-user-select: none; us
       background:#fefcbf; font-weight:600; border-color:#d69e2e;
     }
 
-    .shop {
-      cursor: pointer;
-      transition: filter 0.35s ease, opacity 0.2s ease;
-    }
+    .shop { cursor: pointer; transition: filter 0.35s ease, opacity 0.2s ease; }
+    .shop:hover { opacity: 0.92; }
+    .shop.active { filter: hue-rotate(200deg) saturate(1.7) brightness(1.15) !important; }
 
-    .shop:hover {
-      opacity: 0.92;
-    }
-
-    /* Hue-shift highlight on click – changes whole block color tone */
-    .shop.active {
-      filter: hue-rotate(200deg) saturate(1.7) brightness(1.15) !important;
-      /* You can try other values: hue-rotate(40deg) for warmer, 320deg for purple-ish, etc. */
-    }
-
-    /* Floating Popup */
+    /* Popup */
     #popup {
       position: fixed;
       background: white;
@@ -77,7 +65,6 @@ svg { touch-action: none; -webkit-user-drag: none; -webkit-user-select: none; us
       display: none;
       pointer-events: auto;
     }
-
     #popup:after{
       content:'';
       display: inline-block;
@@ -90,36 +77,11 @@ svg { touch-action: none; -webkit-user-drag: none; -webkit-user-select: none; us
       bottom:-15px;
       position: absolute;
     }
-
-    #popup h2 {
-      margin: 0 0 16px;
-      font-size: 1rem;
-      color: #1a202c;
-    }
-
-    #popup .detail {
-      margin: 10px 0;
-      font-size: 0.8rem;
-      color: #4a5568;
-    }
-
-    #popup .detail strong {
-      color: #2d3748;
-    }
-
-    #close-btn {
-      position: absolute;
-      top: 8px;
-      right: 12px;
-      font-size: 1.8rem;
-      color: #718096;
-      cursor: pointer;
-      line-height: 1;
-    }
-
-    #close-btn:hover {
-      color: #2d3748;
-    }
+    #popup h2 { margin: 0 0 16px; font-size: 1rem; color: #1a202c; }
+    #popup .detail { margin: 10px 0; font-size: 0.8rem; color: #4a5568; }
+    #popup .detail strong { color: #2d3748; }
+    #close-btn { position: absolute; top: 8px; right: 12px; font-size: 1.8rem; color: #718096; cursor: pointer; line-height: 1; }
+    #close-btn:hover { color: #2d3748; }
 
     /* Zoom Buttons */
     #zoom-controls {
@@ -131,7 +93,6 @@ svg { touch-action: none; -webkit-user-drag: none; -webkit-user-select: none; us
       flex-direction: column;
       gap: 8px;
     }
-
     .zoom-btn {
       width: 44px;
       height: 44px;
@@ -149,24 +110,15 @@ svg { touch-action: none; -webkit-user-drag: none; -webkit-user-select: none; us
       justify-content: center;
       user-select: none;
     }
-
-    .zoom-btn:hover {
-      background: #f1f5f9;
-      border-color: #94a3b8;
-      transform: translateY(-1px);
-    }
-
-    .zoom-btn:active {
-      transform: translateY(0);
-      box-shadow: 0 1px 4px rgba(0,0,0,0.15);
-    }
+    .zoom-btn:hover { background: #f1f5f9; border-color: #94a3b8; transform: translateY(-1px); }
+    .zoom-btn:active { transform: translateY(0); box-shadow: 0 1px 4px rgba(0,0,0,0.15); }
   </style>
 </head>
 <body>
-v1.03
+v1.04
 <div id="container">
-  <svg id="map-svg"></svg>
-  
+  <svg id="map-svg" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet"></svg>
+
   <!-- Popup -->
   <div id="popup">
     <span id="close-btn">×</span>
@@ -187,7 +139,7 @@ v1.03
 </div>
 
 <script>
-// SHOP DATA – edit with your real shops
+/* ========== Sample shop data ========== */
 const shopData = {
   "shop-01": { name: "Store 01", tel: "3123 4567", hours: "10:00 – 22:00 daily" },
   "shop-02": { name: "Store 02", tel: "2899 3321", hours: "10:00 – 21:30"      },
@@ -195,15 +147,15 @@ const shopData = {
   "shop-08": { name: "Store 08", tel: "2987 6543", hours: "10:00 – 22:00"      }
 };
 
-// ──────────────────────────────────────────────────────────────
+/* ========== Setup vars ========== */
 const svg = d3.select("#map-svg");
 const container = document.getElementById("container");
-let mapGroup;
+let mapGroup;           // will be the <g id="floorplan">
 let zoomBehavior;
 
 const svgUrl = "https://raw.githubusercontent.com/gad-devv/floorplan/refs/heads/main/floor-01_ai.svg";
 
-// ── Load & Center SVG ──────────────────────────────────────────
+/* ========== Load SVG and move contents into a <g> wrapper ========== */
 fetch(svgUrl)
   .then(response => {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -217,155 +169,112 @@ fetch(svgUrl)
       throw new Error("Invalid SVG format");
     }
 
-    mapGroup = svg.node().appendChild(svgDoc.documentElement);
+    // Imported root (might be an <svg> with viewBox and children)
+    const importedRoot = svgDoc.documentElement;
 
-    svg.append("rect")
-  .attr("width", "100%")
-  .attr("height", "100%")
-  .attr("fill", "none")
-  .attr("pointer-events", "all");
+    // Create wrapper <g> and move all imported children into it
+    const NS = "http://www.w3.org/2000/svg";
+    const wrapper = document.createElementNS(NS, "g");
+    wrapper.setAttribute("id", "floorplan");
 
-    
+    while (importedRoot.firstChild) {
+      // adopt the node into current document and append to wrapper
+      wrapper.appendChild(importedRoot.firstChild);
+    }
 
-    d3.select(mapGroup)
-      .attr("id", "floorplan")
-      .attr("width", "100%")
-      .attr("height", "100%");
+    // If the imported SVG had a viewBox, apply it to our outer svg so coordinates match
+    const vb = importedRoot.getAttribute("viewBox");
+    if (vb) {
+      svg.attr("viewBox", vb);
+    } else {
+      // fallback viewBox — adjust as needed if your SVG lacks one
+      svg.attr("viewBox", "0 0 1012 472");
+    }
 
+    // Append the wrapper group to our outer svg
+    svg.node().appendChild(wrapper);
+    mapGroup = wrapper;
+
+    // Add a transparent rect at the bottom of the stack to capture pointer events reliably
+    // (make it the first child so it doesn't block visual elements)
+    const rect = document.createElementNS(NS, "rect");
+    rect.setAttribute("x", 0);
+    rect.setAttribute("y", 0);
+    rect.setAttribute("width", "100%");
+    rect.setAttribute("height", "100%");
+    rect.setAttribute("fill", "none");
+    rect.setAttribute("pointer-events", "all");
+    svg.node().insertBefore(rect, svg.node().firstChild);
+
+    // Now wire up shops events (elements inside the wrapper with id starting shop-)
     const shops = d3.selectAll("#floorplan g[id^='shop-']");
-/*
-    // ── Build shop list ──────────────────────────────────────────
-    const shopList = d3.select("#shop-list");
+    shops.classed("shop", true).on("click", function(event) {
+      event.stopPropagation();
+      const g = d3.select(this);
+      const id = g.attr("id");
+      const info = shopData[id];
+      if (!info) return;
 
-    const shopEntries = Object.entries(shopData);
-    shopList.selectAll("li")
-      .data(shopEntries)
-      .enter()
-      .append("li")
-      .text(d => d[1].name)
-      .attr("data-id", d => d[0])
-      .on("click", function(event, d) {
-        const shopId = d[0];
-        const shopGroup = d3.select(`#${shopId}`);
+      shops.classed("active", false);
+      g.classed("active", true);
 
-        if (shopGroup.empty()) return;
+      // Use clientX/Y on touch events for positioning
+      const pageX = (event.changedTouches && event.changedTouches[0]) ? event.changedTouches[0].pageX : event.pageX;
+      const pageY = (event.changedTouches && event.changedTouches[0]) ? event.changedTouches[0].pageY : event.pageY;
 
-        // Highlight map shop
-        shops.classed("active", false);
-        shopGroup.classed("active", true);
+      d3.select("#popup")
+        .style("left", (pageX - 10) + "px")
+        .style("top",  (pageY - 180) + "px")
+        .style("display", "block");
 
-        // Highlight list item
-        shopList.selectAll("li").classed("active", false);
-        d3.select(this).classed("active", true);
+      document.getElementById("shop-title").textContent = info.name;
+      document.getElementById("shop-tel").textContent   = info.tel   || "—";
+      document.getElementById("shop-hours").textContent = info.hours || "—";
+    });
 
-        // Open popup (centered for list click)
-        document.getElementById("shop-title").textContent = d[1].name;
-        document.getElementById("shop-tel").textContent   = d[1].tel   || "—";
-        document.getElementById("shop-hours").textContent = d[1].hours || "—";
-
-        d3.select("#popup")
-          .style("left", "50%")
-          .style("top", "40%")
-          .style("transform", "translate(-50%, -50%)")
-          .style("display", "block");
-
-        // Zoom & center on shop
-        const bbox = shopGroup.node().getBBox();
-        const cx = bbox.x + bbox.width / 2;
-        const cy = bbox.y + bbox.height / 2;
-
-        const t = d3.zoomIdentity
-          .translate(container.clientWidth / 2, container.clientHeight / 2)
-          .scale(2.5)  // zoom level when clicking from list
-          .translate(-cx, -cy);
-
-        svg.transition().duration(750).call(zoomBehavior.transform, t);
-      });*/
-    shops
-      .classed("shop", true)
-      .on("click", function(event) {
-        event.stopPropagation();
-
-        const g = d3.select(this);
-        const id = g.attr("id");
-        const info = shopData[id];
-
-        if (!info) return;
-
-        shops.classed("active", false);
-        g.classed("active", true);
-
-        const pageX = event.pageX;
-        const pageY = event.pageY;
-
-        d3.select("#popup")
-          .style("left", (pageX - 10) + "px")
-          .style("top",  (pageY - 180) + "px")
-          .style("display", "block");
-
-        document.getElementById("shop-title").textContent = info.name;
-        document.getElementById("shop-tel").textContent   = info.tel   || "—";
-        document.getElementById("shop-hours").textContent = info.hours || "—";
-      });
-
-    // ── Zoom behavior ────────────────────────────────────────────
-   zoomBehavior = d3.zoom()
+    /* ========== Setup zoom behavior (correct usage) ========== */
+    zoomBehavior = d3.zoom()
       .scaleExtent([0.3, 12])
       .translateExtent([[-3000, -3000], [5000, 5000]])
-      .on("zoom", ({transform}) => {
-        mapGroup.setAttribute("transform", transform);
+      .on("zoom", (event) => {
+        // set transform string on the <g> wrapper
+        d3.select(mapGroup).attr("transform", event.transform.toString());
       });
 
-
-
+    // install zoom on the svg so d3 stores internal state and receives pointer events
     svg.call(zoomBehavior);
 
-    // ── Auto-center & fit to viewport on load ────────────────────
-    const viewBox = mapGroup.getAttribute("viewBox") || "0 0 1012 472";
-    const [, , vbWidth, vbHeight] = viewBox.split(/\s+/).map(Number);
+    /* ========== Compute a fit-to-view initial transform and apply it ========== */
+    const viewBoxAttr = svg.attr("viewBox") || "0 0 1012 472";
+    const vbParts = viewBoxAttr.split(/\s+/).map(Number);
+    const vbWidth = vbParts[2];
+    const vbHeight = vbParts[3];
 
     const containerWidth  = container.clientWidth;
     const containerHeight = container.clientHeight;
 
-    let scale = Math.min(
-      containerWidth / vbWidth,
-      containerHeight / vbHeight
-    ) * 0.98;  // slight margin
+    let scale = Math.min(containerWidth / vbWidth, containerHeight / vbHeight) * 0.98;
+    scale = Math.max(scale, 0.9); // avoid being too small on narrow screens
 
-    // Prevent too small on ultra-wide or very tall screens
-    scale = Math.max(scale, 0.9);
-
-    console.log(containerWidth,vbWidth);
-    console.log(containerHeight,vbHeight);
-
-    let tx = (containerWidth  - vbWidth  * scale) / 2;
+    const tx = (containerWidth  - vbWidth  * scale) / 2;
     const ty = (containerHeight - vbHeight * scale) / 2;
 
+    const initialTransform = d3.zoomIdentity.translate(tx, ty).scale(scale);
 
+    // Apply initial transform through d3.zoom to sync internal state
+    // Use transition for a subtle animation on load
+    svg.transition().duration(600).call(zoomBehavior.transform, initialTransform);
 
-    const initialTransform = d3.zoomIdentity
-      .translate(tx, ty)
-      .scale(scale);
-
-    //svg.call(zoomBehavior.transform, initialTransform);
-    //svg.transition().duration(600).call(zoomBehavior.transform, initialTransform);
-
-    // ── Responsive: re-fit on resize ─────────────────────────────
+    /* ========== Responsive: re-fit on resize (kept simple) ========== */
     function resize() {
       const cw = container.clientWidth;
       const ch = container.clientHeight;
-
       let newScale = Math.min(cw / vbWidth, ch / vbHeight) * 0.98;
       newScale = Math.max(newScale, 0.8);
       const newTx = (cw - vbWidth  * newScale) / 2;
       const newTy = (ch - vbHeight * newScale) / 2;
-
-      /*svg.transition().duration(600).call(
-        zoomBehavior.transform,
-        d3.zoomIdentity.translate(newTx, newTy).scale(newScale)
-      );*/
+      svg.transition().duration(400).call(zoomBehavior.transform, d3.zoomIdentity.translate(newTx, newTy).scale(newScale));
     }
-
     window.addEventListener("resize", resize);
 
   })
@@ -374,34 +283,33 @@ fetch(svgUrl)
     alert("Cannot load SVG from GitHub.\nCheck connection or open via local server.");
   });
 
-// ── Zoom Buttons ─────────────────────────────────────────────────
+/* ========== Zoom Buttons ========== */
 const zoomFactor = 1.4;
 
 d3.select("#zoom-in").on("click", () => {
-  svg.transition().duration(400).call(
-    zoomBehavior.scaleBy,
-    zoomFactor,
-    [container.clientWidth / 2, container.clientHeight / 2]
-  );
+  // compute center in client coords for focal point
+  const rect = svg.node().getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top  + rect.height / 2;
+  svg.transition().duration(400).call(zoomBehavior.scaleBy, zoomFactor, [cx, cy]);
 });
 
 d3.select("#zoom-out").on("click", () => {
-  svg.transition().duration(400).call(
-    zoomBehavior.scaleBy,
-    1 / zoomFactor,
-    [container.clientWidth / 2, container.clientHeight / 2]
-  );
+  const rect = svg.node().getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top  + rect.height / 2;
+  svg.transition().duration(400).call(zoomBehavior.scaleBy, 1 / zoomFactor, [cx, cy]);
 });
 
-// ── Close popup ─────────────────────────────────────────────────
+/* ========== Popup and UI handlers ========== */
 function closePopup() {
   d3.select("#popup").style("display", "none");
   d3.selectAll(".shop.active").classed("active", false);
 }
-
 d3.select("#close-btn").on("click", closePopup);
 
 svg.on("click", function(event) {
+  // if click on svg background (not on shop groups), close popup
   if (event.target === this || !event.target.closest(".shop")) {
     closePopup();
   }
@@ -410,7 +318,6 @@ svg.on("click", function(event) {
 document.addEventListener("keydown", e => {
   if (e.key === "Escape") closePopup();
 });
-
 </script>
 </body>
 </html>
