@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Interactive Floor Plan - Full Width & Hue Highlight</title>
+  
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #f8f9fa;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #container {
+      width: 100vw;
+      height: 50vh;
+      margin-top:10vh;
+      position: relative;
+      background: #f0f2f5;
+    }
+
+    #map-svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    #shop-list-container {
+      height:40vh; max-height:300px; overflow-y:auto; background:#fff; border-top:1px solid #e2e8f0;
+      padding:16px; font-size:1rem; color:#2d3748;
+    }
+    #shop-list { list-style:none; }
+    #shop-list li {
+      padding:10px 12px; margin:6px 0; border-radius:6px; cursor:pointer; transition:all 0.2s;
+      border:1px solid #e2e8f0;
+    }
+    #shop-list li:hover { background:#f1f5f9; }
+    #shop-list li.active {
+      background:#fefcbf; font-weight:600; border-color:#d69e2e;
+    }
+
+    .shop {
+      cursor: pointer;
+      transition: filter 0.35s ease, opacity 0.2s ease;
+    }
+
+    .shop:hover {
+      opacity: 0.92;
+    }
+
+    /* Hue-shift highlight on click – changes whole block color tone */
+    .shop.active {
+      filter: hue-rotate(200deg) saturate(1.7) brightness(1.15) !important;
+      /* You can try other values: hue-rotate(40deg) for warmer, 320deg for purple-ish, etc. */
+    }
+
+    /* Floating Popup */
+    #popup {
+      position: fixed;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+      padding: 20px 24px;
+      max-width: 360px;
+      width: auto;
+      z-index: 1000;
+      display: none;
+      pointer-events: auto;
+    }
+
+    #popup:after{
+      content:'';
+      display: inline-block;
+      width: 0;
+      height: 0;
+      border-left: 15px solid transparent;
+      border-right: 15px solid transparent;
+      border-top: 15px solid white;
+      left:1rem;
+      bottom:-15px;
+      position: absolute;
+    }
+
+    #popup h2 {
+      margin: 0 0 16px;
+      font-size: 1rem;
+      color: #1a202c;
+    }
+
+    #popup .detail {
+      margin: 10px 0;
+      font-size: 0.8rem;
+      color: #4a5568;
+    }
+
+    #popup .detail strong {
+      color: #2d3748;
+    }
+
+    #close-btn {
+      position: absolute;
+      top: 8px;
+      right: 12px;
+      font-size: 1.8rem;
+      color: #718096;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    #close-btn:hover {
+      color: #2d3748;
+    }
+
+    /* Zoom Buttons */
+    #zoom-controls {
+      position: absolute;
+      bottom: 30px;
+      right: 30px;
+      z-index: 1100;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .zoom-btn {
+      width: 44px;
+      height: 44px;
+      background: white;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 1.6rem;
+      font-weight: bold;
+      color: #334155;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+    }
+
+    .zoom-btn:hover {
+      background: #f1f5f9;
+      border-color: #94a3b8;
+      transform: translateY(-1px);
+    }
+
+    .zoom-btn:active {
+      transform: translateY(0);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+    }
+  </style>
+</head>
+<body>
+
+<div id="container">
+  <svg id="map-svg"></svg>
+  
+  <!-- Popup -->
+  <div id="popup">
+    <span id="close-btn">×</span>
+    <h2 id="shop-title">Shop Name</h2>
+    <div class="detail"><strong>Telephone:</strong><br/><span id="shop-tel">—</span></div>
+    <div class="detail"><strong>Opening Hours:</strong><br/><span id="shop-hours">—</span></div>
+  </div>
+
+  <!-- Zoom Controls -->
+  <div id="zoom-controls">
+    <button class="zoom-btn" id="zoom-in">+</button>
+    <button class="zoom-btn" id="zoom-out">−</button>
+  </div>
+</div>
+
+<div id="shop-list-container">
+  <ul id="shop-list"></ul>
+</div>
+
+<script>
+// SHOP DATA – edit with your real shops
+const shopData = {
+  "shop-01": { name: "Store 01", tel: "3123 4567", hours: "10:00 – 22:00 daily" },
+  "shop-02": { name: "Store 02", tel: "2899 3321", hours: "10:00 – 21:30"      },
+  "shop-05": { name: "Store 05", tel: "2345 6789", hours: "08:00 – 23:00"      },
+  "shop-08": { name: "Store 08", tel: "2987 6543", hours: "10:00 – 22:00"      }
+};
+
+// ──────────────────────────────────────────────────────────────
+const svg = d3.select("#map-svg");
+const container = document.getElementById("container");
+let mapGroup;
+let zoomBehavior;
+
+const svgUrl = "https://raw.githubusercontent.com/gad-devv/floorplan/refs/heads/main/floor-01_ai.svg";
+
+// ── Load & Center SVG ──────────────────────────────────────────
+fetch(svgUrl)
+  .then(response => {
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.text();
+  })
+  .then(svgText => {
+    const parser = new DOMParser();
+    const svgDoc = parser.parseFromString(svgText, "image/svg+xml");
+
+    if (svgDoc.querySelector("parsererror")) {
+      throw new Error("Invalid SVG format");
+    }
+
+    mapGroup = svg.node().appendChild(svgDoc.documentElement);
+
+    d3.select(mapGroup)
+      .attr("id", "floorplan")
+      .attr("width", "100%")
+      .attr("height", "100%");
+
+    const shops = d3.selectAll("#floorplan g[id^='shop-']");
+/*
+    // ── Build shop list ──────────────────────────────────────────
+    const shopList = d3.select("#shop-list");
+
+    const shopEntries = Object.entries(shopData);
+    shopList.selectAll("li")
+      .data(shopEntries)
+      .enter()
+      .append("li")
+      .text(d => d[1].name)
+      .attr("data-id", d => d[0])
+      .on("click", function(event, d) {
+        const shopId = d[0];
+        const shopGroup = d3.select(`#${shopId}`);
+
+        if (shopGroup.empty()) return;
+
+        // Highlight map shop
+        shops.classed("active", false);
+        shopGroup.classed("active", true);
+
+        // Highlight list item
+        shopList.selectAll("li").classed("active", false);
+        d3.select(this).classed("active", true);
+
+        // Open popup (centered for list click)
+        document.getElementById("shop-title").textContent = d[1].name;
+        document.getElementById("shop-tel").textContent   = d[1].tel   || "—";
+        document.getElementById("shop-hours").textContent = d[1].hours || "—";
+
+        d3.select("#popup")
+          .style("left", "50%")
+          .style("top", "40%")
+          .style("transform", "translate(-50%, -50%)")
+          .style("display", "block");
+
+        // Zoom & center on shop
+        const bbox = shopGroup.node().getBBox();
+        const cx = bbox.x + bbox.width / 2;
+        const cy = bbox.y + bbox.height / 2;
+
+        const t = d3.zoomIdentity
+          .translate(container.clientWidth / 2, container.clientHeight / 2)
+          .scale(2.5)  // zoom level when clicking from list
+          .translate(-cx, -cy);
+
+        svg.transition().duration(750).call(zoomBehavior.transform, t);
+      });*/
+    shops
+      .classed("shop", true)
+      .on("click", function(event) {
+        event.stopPropagation();
+
+        const g = d3.select(this);
+        const id = g.attr("id");
+        const info = shopData[id];
+
+        if (!info) return;
+
+        shops.classed("active", false);
+        g.classed("active", true);
+
+        const pageX = event.pageX;
+        const pageY = event.pageY;
+
+        d3.select("#popup")
+          .style("left", (pageX - 10) + "px")
+          .style("top",  (pageY - 180) + "px")
+          .style("display", "block");
+
+        document.getElementById("shop-title").textContent = info.name;
+        document.getElementById("shop-tel").textContent   = info.tel   || "—";
+        document.getElementById("shop-hours").textContent = info.hours || "—";
+      });
+
+    // ── Zoom behavior ────────────────────────────────────────────
+    zoomBehavior = d3.zoom()
+      .scaleExtent([0.3, 12])
+      .translateExtent([[-3000, -3000], [5000, 5000]])
+      .on("zoom", ({transform}) => {
+        mapGroup.setAttribute("transform", transform);
+      });
+
+    svg.call(zoomBehavior);
+
+    // ── Auto-center & fit to viewport on load ────────────────────
+    const viewBox = mapGroup.getAttribute("viewBox") || "0 0 1012 472";
+    const [, , vbWidth, vbHeight] = viewBox.split(/\s+/).map(Number);
+
+    const containerWidth  = container.clientWidth;
+    const containerHeight = container.clientHeight;
+
+    let scale = Math.min(
+      containerWidth / vbWidth,
+      containerHeight / vbHeight
+    ) * 0.98;  // slight margin
+
+    // Prevent too small on ultra-wide or very tall screens
+    scale = Math.max(scale, 0.9);
+
+    console.log(containerWidth,vbWidth);
+    console.log(containerHeight,vbHeight);
+
+    let tx = (containerWidth  - vbWidth  * scale) / 2;
+    const ty = (containerHeight - vbHeight * scale) / 2;
+
+
+
+    const initialTransform = d3.zoomIdentity
+      .translate(tx, ty)
+      .scale(scale);
+
+    //svg.call(zoomBehavior.transform, initialTransform);
+    //svg.transition().duration(600).call(zoomBehavior.transform, initialTransform);
+
+    // ── Responsive: re-fit on resize ─────────────────────────────
+    function resize() {
+      const cw = container.clientWidth;
+      const ch = container.clientHeight;
+
+      let newScale = Math.min(cw / vbWidth, ch / vbHeight) * 0.98;
+      newScale = Math.max(newScale, 0.8);
+      const newTx = (cw - vbWidth  * newScale) / 2;
+      const newTy = (ch - vbHeight * newScale) / 2;
+
+      /*svg.transition().duration(600).call(
+        zoomBehavior.transform,
+        d3.zoomIdentity.translate(newTx, newTy).scale(newScale)
+      );*/
+    }
+
+    window.addEventListener("resize", resize);
+
+  })
+  .catch(err => {
+    console.error("Failed to load SVG:", err);
+    alert("Cannot load SVG from GitHub.\nCheck connection or open via local server.");
+  });
+
+// ── Zoom Buttons ─────────────────────────────────────────────────
+const zoomFactor = 1.4;
+
+d3.select("#zoom-in").on("click", () => {
+  svg.transition().duration(400).call(
+    zoomBehavior.scaleBy,
+    zoomFactor,
+    [container.clientWidth / 2, container.clientHeight / 2]
+  );
+});
+
+d3.select("#zoom-out").on("click", () => {
+  svg.transition().duration(400).call(
+    zoomBehavior.scaleBy,
+    1 / zoomFactor,
+    [container.clientWidth / 2, container.clientHeight / 2]
+  );
+});
+
+// ── Close popup ─────────────────────────────────────────────────
+function closePopup() {
+  d3.select("#popup").style("display", "none");
+  d3.selectAll(".shop.active").classed("active", false);
+}
+
+d3.select("#close-btn").on("click", closePopup);
+
+svg.on("click", function(event) {
+  if (event.target === this || !event.target.closest(".shop")) {
+    closePopup();
+  }
+});
+
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") closePopup();
+});
+
+</script>
+</body>
+</html>
