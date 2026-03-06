@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Interactive Floor Plan v1.07</title>
+  <title>Interactive Floor Plan v1.08</title>
 
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 
@@ -113,7 +113,7 @@
   </style>
 </head>
 <body>
-v1.07
+v1.08
 <div id="container">
   <svg id="map-svg" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet"></svg>
 
@@ -222,7 +222,7 @@ fetch(svgUrl)
       const pageX = (event.changedTouches && event.changedTouches[0]) ? event.changedTouches[0].pageX : event.pageX;
       const pageY = (event.changedTouches && event.changedTouches[0]) ? event.changedTouches[0].pageY : event.pageY;
       
-     d3.select('#map-svg').on('click', function(event) {
+   svg.on("click", function(event) {
   // event is the native DOM event forwarded by d3
   const shopEl = event.target.closest('.shop');
   if (!shopEl) return;
