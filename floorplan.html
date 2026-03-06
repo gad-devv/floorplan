@@ -32,7 +32,10 @@
     }
     .shop { cursor:pointer; transition:filter 0.35s ease, opacity 0.2s ease; }
     .shop:hover { opacity:0.92; }
-    .shop.active { filter:hue-rotate(200deg) saturate(1.7) brightness(1.15) !important; }
+    .shop.active { 
+      -webkit-filter: hue-rotate(200deg) saturate(1.7) brightness(1.15) !important; 
+      filter:hue-rotate(200deg) saturate(1.7) brightness(1.15) !important; 
+    }
     #popup-container {
       position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:900;
     }
