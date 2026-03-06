@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Interactive Floor Plan v1.01 - Full Width & Hue Highlight</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+  <title>Interactive Floor Plan v1.02 - Full Width & Hue Highlight</title>
   
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
   
@@ -34,10 +34,8 @@
       height: 100%;
       display: block;
     }
-    #map-svg,
-#map-area,
-#floorplan {
-  touch-action: manipulation;   /* or pan-x pan-y pinch-zoom */
+html, body, #container, #map-area, #map-svg, #floorplan {
+  touch-action: manipulation;
 }
     #shop-list-container {
       height:40vh; max-height:300px; overflow-y:auto; background:#fff; border-top:1px solid #e2e8f0;
@@ -223,6 +221,14 @@ fetch(svgUrl)
 
     mapGroup = svg.node().appendChild(svgDoc.documentElement);
 
+    svg.append("rect")
+  .attr("width", "100%")
+  .attr("height", "100%")
+  .attr("fill", "none")
+  .attr("pointer-events", "all");
+
+    
+
     d3.select(mapGroup)
       .attr("id", "floorplan")
       .attr("width", "100%")
@@ -305,12 +311,24 @@ fetch(svgUrl)
       });
 
     // ── Zoom behavior ────────────────────────────────────────────
-    zoomBehavior = d3.zoom()
+  /*  zoomBehavior = d3.zoom()
       .scaleExtent([0.3, 12])
       .translateExtent([[-3000, -3000], [5000, 5000]])
       .on("zoom", ({transform}) => {
         mapGroup.setAttribute("transform", transform);
-      });
+      });*/
+
+    zoomBehavior = d3.zoom()
+  .scaleExtent([0.3, 12])
+  .translateExtent([[-3000, -3000], [5000, 5000]])
+  .touchable(true)                     // ← explicit touch support
+  .filter(event => {
+    if (event.type.startsWith("touch")) return true;
+    return !event.button;
+  })
+  .on("zoom", ({transform}) => {
+    mapGroup.setAttribute("transform", transform);
+  });
 
     svg.call(zoomBehavior);
 
